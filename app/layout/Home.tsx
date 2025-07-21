@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { HiArrowRight } from "react-icons/hi";
 import { FaInstagram, FaLinkedin } from "react-icons/fa";
 import ParticleSphere from "../component/ParticleSphere";
+import { useEffect } from "react";
 
 export function Home() {
   const color = "#000000"; // You can change this to any color you want
@@ -17,6 +18,19 @@ export function Home() {
   const particleCount = 5000; // Number of particles in the sphere
   // Factor for settling the particles
 
+  useEffect(() => {
+    // This effect runs once when the component mounts
+    const handleResize = () => {
+      // You can add any logic here that needs to run on resize
+      console.log("Window resized");
+    };
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      // Cleanup the event listener on component unmount
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []); // Empty dependency array means this effect runs once on mount
   return (
     <PageTransition>
       <section className='flex flex-col items-center justify-center min-h-lvh px-4 2xl:px-0 overflow-x-hidden '>
