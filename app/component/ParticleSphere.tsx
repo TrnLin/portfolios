@@ -9,6 +9,7 @@ const vertexShader = `
   attribute float randomOffset;
   varying vec3 vColor;
   varying float vAlpha;
+  varying float vMouseDistance;
   
   uniform float time;
   uniform vec3 mousePosition3D;
@@ -22,23 +23,67 @@ const vertexShader = `
   uniform float dropTime;
   uniform float dropStrength;
   uniform float baseOpacity;
+  uniform vec3 mouseInteractionColor;
   
+  // Simple 3D noise function for organic movement
+  float noise3D(vec3 p) {
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    
+    float n = i.x + i.y * 57.0 + 113.0 * i.z;
+    return mix(
+      mix(mix(sin(n), sin(n + 1.0), f.x),
+          mix(sin(n + 57.0), sin(n + 58.0), f.x), f.y),
+      mix(mix(sin(n + 113.0), sin(n + 114.0), f.x),
+          mix(sin(n + 170.0), sin(n + 171.0), f.x), f.y),
+      f.z
+    ) * 0.5 + 0.5;
+  }
   void main() {
     vColor = customColor;
     
     vec3 pos = position;
     vec3 originalPos = pos;
     
-    // Optimized base chaotic movement
-    float timeOffset = randomOffset * 6.28318; // Use 2π for better distribution
-    float chaos = chaosAmount * 0.2; // Reduced for better performance
+    // Enhanced chaotic movement with noise
+    float timeOffset = randomOffset * 6.28318;
+    float chaos = chaosAmount * 1.0; // Increased chaos for more movement
     
-    // Simplified wave calculations
-    float wave1 = sin(time * 0.8 + timeOffset + pos.y * 1.5) * chaos;
-    float wave2 = cos(time * 1.0 + timeOffset + pos.z * 1.3) * chaos;
-    float wave3 = sin(time * 1.2 + timeOffset + pos.x * 1.7) * chaos;
+    // Multi-layered noise for organic floating effect
+    float noise1 = noise3D(pos * 0.5 + time * 0.15 + vec3(randomOffset * 10.0));
+    float noise2 = noise3D(pos * 0.3 + time * 0.1 + vec3(randomOffset * 5.0));
+    float noise3 = noise3D(pos * 0.8 + time * 0.2 + vec3(randomOffset * 15.0));
     
+    // Combine noise layers for complex movement
+    vec3 noiseDisplacement = vec3(
+      noise1 * 2.0 - 1.0,
+      noise2 * 2.0 - 1.0,
+      noise3 * 2.0 - 1.0
+    ) * chaos * 0.8;
+    
+    // Enhanced wave calculations with more variety
+    float wave1 = sin(time * 0.8 + timeOffset + pos.y * 1.5 + noise1 * 2.0) * chaos;
+    float wave2 = cos(time * 1.0 + timeOffset + pos.z * 1.3 + noise2 * 2.0) * chaos;
+    float wave3 = sin(time * 1.2 + timeOffset + pos.x * 1.7 + noise3 * 2.0) * chaos;
+    
+    // Breathing/pulsing effect
+    float pulse = sin(time * 0.5 + randomOffset * 6.28) * 0.3;
+    vec3 pulseDirection = normalize(pos + vec3(0.001));
+    
+    // Orbital/swirling motion
+    float swirl = time * 0.3 + randomOffset * 6.28;
+    vec3 swirlOffset = vec3(
+      cos(swirl) * sin(pos.y * 0.5),
+      sin(swirl) * cos(pos.x * 0.5),
+      cos(swirl + 1.57) * sin(pos.z * 0.5)
+    ) * chaos * 0.6;
+    
+    // Apply all movement effects
     pos += vec3(wave1, wave2, wave3);
+    pos += noiseDisplacement;
+    pos += pulseDirection * pulse * chaos;
+    pos += swirlOffset;
     
     // Enhanced water drop effect with realistic physics
     if (dropStrength > 0.01) {
@@ -137,31 +182,58 @@ const vertexShader = `
       }
     }
     
-    // Optimized mouse interaction
+    // Enhanced mouse interaction with stronger effects
     if (mouseInfluence > 0.01) {
       vec3 mousePos3D = mousePosition3D;
       float distanceToMouse = length(pos - mousePos3D);
       
-      if (distanceToMouse < 4.0) { // Only affect nearby particles
-        // Single wave calculation
-        float wave = sin(distanceToMouse * 4.0 - time * 3.0) * 
-                    exp(-distanceToMouse * 0.8) * 
-                    waveAmplitude * 
-                    mouseInfluence;
+      if (distanceToMouse < 5.5) { // Larger interaction radius
+        // Enhanced wave calculation with multiple frequencies
+        float wave1 = sin(distanceToMouse * 3.0 - time * 4.0) * 
+                     exp(-distanceToMouse * 0.5) * 
+                     waveAmplitude * 
+                     mouseInfluence * 0.8;
+        
+        float wave2 = cos(distanceToMouse * 6.0 - time * 5.0) * 
+                     exp(-distanceToMouse * 0.7) * 
+                     waveAmplitude * 
+                     mouseInfluence * 0.4;
         
         vec3 waveDirection = normalize(pos - mousePos3D + vec3(0.001));
-        pos += waveDirection * wave * 0.3;
         
-        // Simplified flow
-        vec3 mouseVelocity = (mousePos3D - prevMousePosition3D) * 20.0;
-        float influence = exp(-distanceToMouse * 0.6) * mouseInfluence;
-        pos += mouseVelocity * influence * fluidViscosity * 0.01;
+        // Stronger displacement
+        pos += waveDirection * (wave1 + wave2) * 0.7;
+        
+        // Add spiral/vortex effect around mouse
+        vec3 tangent = cross(waveDirection, vec3(0.0, 1.0, 0.0));
+        float vortexStrength = exp(-distanceToMouse * 0.4) * mouseInfluence;
+        pos += tangent * sin(time * 2.0 + distanceToMouse * 2.0) * vortexStrength * 0.5;
+        
+        // Enhanced flow with drag
+        vec3 mouseVelocity = (mousePos3D - prevMousePosition3D) * 30.0;
+        float influence = exp(-distanceToMouse * 0.4) * mouseInfluence;
+        pos += mouseVelocity * influence * fluidViscosity * 0.03;
+        
+        // Attraction/repulsion effect
+        float pushPull = sin(time * 3.0 + randomOffset * 6.28) * 0.3;
+        pos += waveDirection * pushPull * influence * 0.4;
       }
     }
     
-    // Simplified base water motion
-    float waterMotion = sin(time * 0.5 + originalPos.x + originalPos.y * 0.8) * 0.02;
-    pos.z += waterMotion;
+    // Enhanced base water motion with more complexity
+    float waterMotion1 = sin(time * 0.5 + originalPos.x + originalPos.y * 0.8) * 0.04;
+    float waterMotion2 = cos(time * 0.3 + originalPos.z + originalPos.x * 0.6) * 0.03;
+    pos.z += waterMotion1;
+    pos.y += waterMotion2;
+    
+    // Add gentle drift away from sphere center
+    float driftAmount = sin(time * 0.2 + randomOffset * 6.28) * 0.15;
+    vec3 driftDirection = normalize(originalPos + vec3(
+      sin(randomOffset * 10.0),
+      cos(randomOffset * 8.0),
+      sin(randomOffset * 12.0)
+    ));
+    pos += driftDirection * driftAmount * chaos;
     
     // Enhanced alpha calculation with realistic drop effects
     float movement = length(pos - originalPos);
@@ -203,6 +275,39 @@ const vertexShader = `
         dropEffect += tensionGlow * 0.2;
       }
     }
+    
+    // Dynamic color mixing based on mouse proximity
+    float distanceToMouse = length(pos - mousePosition3D);
+    vMouseDistance = distanceToMouse;
+    
+    // Calculate color influence based on distance and mouse influence
+    float colorInfluenceRadius = 4.0;
+    float colorMixFactor = 0.0;
+    
+    if (mouseInfluence > 0.01 && distanceToMouse < colorInfluenceRadius) {
+      // Smooth falloff from center
+      float distanceFactor = 1.0 - (distanceToMouse / colorInfluenceRadius);
+      distanceFactor = pow(distanceFactor, 2.0); // Quadratic falloff for smoother transition
+      
+      // Wave effect for dynamic color change
+      float colorWave = sin(distanceToMouse * 2.0 - time * 3.0) * 0.5 + 0.5;
+      
+      colorMixFactor = distanceFactor * mouseInfluence * (0.7 + colorWave * 0.3);
+    }
+    
+    // Add drop effect color influence
+    if (dropStrength > 0.01) {
+      float dropAge = time - dropTime;
+      float distanceToDrop = length(pos - dropPosition);
+      
+      if (distanceToDrop < 3.0 && dropAge < 2.0) {
+        float dropColorInfluence = exp(-distanceToDrop * 0.5) * dropStrength * exp(-dropAge * 1.0);
+        colorMixFactor = max(colorMixFactor, dropColorInfluence * 0.6);
+      }
+    }
+    
+    // Mix original color with interaction color
+    vColor = mix(customColor, mouseInteractionColor, colorMixFactor);
     
     vAlpha = clamp(baseOpacity + movement * 0.2 + dropEffect + mouseEffect * 0.15, 0.1, 1.0);
     
@@ -248,6 +353,7 @@ const vertexShader = `
 const fragmentShader = `
   varying vec3 vColor;
   varying float vAlpha;
+  varying float vMouseDistance;
   
   uniform float blurAmount;
   uniform float baseOpacity;
@@ -283,6 +389,7 @@ interface ParticleSystemProps {
   fluidViscosity?: number;
   waveAmplitude?: number;
   opacity?: number;
+  mouseInteractionColor?: string;
 }
 
 function ParticleSystem({
@@ -295,15 +402,18 @@ function ParticleSystem({
   fluidViscosity = 0.4,
   waveAmplitude = 0.3,
   opacity = 0.7,
+  mouseInteractionColor = "#ff6b9d",
 }: ParticleSystemProps) {
   const meshRef = useRef<THREE.Points>(null);
   const particleGroupRef = useRef<THREE.Group>(null);
   const currentMousePos = useRef(new THREE.Vector3());
   const prevMousePos = useRef(new THREE.Vector3());
   const mouseInfluenceRef = useRef(0);
+  const targetMouseInfluence = useRef(0);
   const lastMouseTime = useRef(0);
   const isMouseOverSphere = useRef(false);
   const frameCount = useRef(0);
+  const mouseLeaveTimeoutRef = useRef<number | null>(null);
 
   const { raycaster, mouse, camera, gl } = useThree();
 
@@ -360,8 +470,9 @@ function ParticleSystem({
       dropTime: { value: 0 },
       dropStrength: { value: 0 },
       baseOpacity: { value: opacity },
+      mouseInteractionColor: { value: new THREE.Color(mouseInteractionColor) },
     }),
-    []
+    [mouseInteractionColor]
   );
 
   // Update uniforms only when props change
@@ -387,8 +498,7 @@ function ParticleSystem({
     []
   );
 
-  // Throttled mouse update function
-  // Update the updateMousePosition function:
+  // Enhanced mouse update function with smooth transitions
   const updateMousePosition = useCallback(
     (event: MouseEvent) => {
       const rect = gl.domElement.getBoundingClientRect();
@@ -398,7 +508,7 @@ function ParticleSystem({
       mouse.set(x, y);
       raycaster.setFromCamera(mouse, camera);
 
-      // FIX: Create a mesh that rotates with the particle group
+      // Create a mesh that rotates with the particle group
       if (particleGroupRef.current) {
         const tempMesh = new THREE.Mesh(interactionSphere);
 
@@ -411,7 +521,19 @@ function ParticleSystem({
         const intersects = raycaster.intersectObject(tempMesh);
 
         if (intersects.length > 0) {
-          isMouseOverSphere.current = true;
+          // Mouse entered or is over the sphere
+          if (!isMouseOverSphere.current) {
+            // Just entered - smooth fade in
+            isMouseOverSphere.current = true;
+            gl.domElement.style.cursor = "pointer";
+          }
+
+          // Clear any pending leave timeout
+          if (mouseLeaveTimeoutRef.current) {
+            clearTimeout(mouseLeaveTimeoutRef.current);
+            mouseLeaveTimeoutRef.current = null;
+          }
+
           const point = intersects[0].point;
 
           // Transform the world space intersection point to local space
@@ -420,18 +542,30 @@ function ParticleSystem({
 
           prevMousePos.current.copy(currentMousePos.current);
           currentMousePos.current.copy(localPoint);
-          mouseInfluenceRef.current = 1;
+          targetMouseInfluence.current = 1;
           lastMouseTime.current = Date.now();
         } else {
-          isMouseOverSphere.current = false;
-          mouseInfluenceRef.current = 0;
+          // Mouse left the sphere
+          if (isMouseOverSphere.current) {
+            isMouseOverSphere.current = false;
+            gl.domElement.style.cursor = "default";
+            targetMouseInfluence.current = 0;
+
+            // Set a timeout to ensure smooth fade out
+            if (mouseLeaveTimeoutRef.current) {
+              clearTimeout(mouseLeaveTimeoutRef.current);
+            }
+            mouseLeaveTimeoutRef.current = window.setTimeout(() => {
+              targetMouseInfluence.current = 0;
+            }, 100);
+          }
         }
       }
     },
     [raycaster, mouse, camera, gl, interactionSphere]
   );
 
-  // Throttled event handlers
+  // Enhanced event handlers with mouse leave detection
   useEffect(() => {
     const canvas = gl.domElement;
     let mouseMoveThrottle: number;
@@ -445,6 +579,13 @@ function ParticleSystem({
           isThrottling = false;
         }, 16); // ~60fps throttling
       }
+    };
+
+    const handleMouseLeave = () => {
+      // Mouse left the canvas entirely
+      isMouseOverSphere.current = false;
+      targetMouseInfluence.current = 0;
+      canvas.style.cursor = "default";
     };
 
     const handleClick = (event: MouseEvent) => {
@@ -498,12 +639,17 @@ function ParticleSystem({
     };
 
     canvas.addEventListener("mousemove", throttledMouseMove);
+    canvas.addEventListener("mouseleave", handleMouseLeave);
     canvas.addEventListener("click", handleClick);
 
     return () => {
       canvas.removeEventListener("mousemove", throttledMouseMove);
+      canvas.removeEventListener("mouseleave", handleMouseLeave);
       canvas.removeEventListener("click", handleClick);
       if (mouseMoveThrottle) clearTimeout(mouseMoveThrottle);
+      if (mouseLeaveTimeoutRef.current)
+        clearTimeout(mouseLeaveTimeoutRef.current);
+      canvas.style.cursor = "default";
     };
   }, [gl, uniforms, updateMousePosition]);
 
@@ -513,23 +659,39 @@ function ParticleSystem({
     if (meshRef.current && particleGroupRef.current) {
       uniforms.time.value = state.clock.elapsedTime;
 
-      // Update mouse influence with throttling
-      if (frameCount.current % 2 === 0) {
-        // Update every other frame
-        if (isMouseOverSphere.current) {
-          const timeSinceLastMouse = Date.now() - lastMouseTime.current;
-          if (timeSinceLastMouse > 100) {
-            mouseInfluenceRef.current = Math.max(
-              0,
-              mouseInfluenceRef.current - 0.02
-            );
-          }
-        }
+      // Smooth interpolation of mouse influence for fade in/out
+      const influenceDelta =
+        targetMouseInfluence.current - mouseInfluenceRef.current;
 
-        uniforms.mouseInfluence.value = mouseInfluenceRef.current;
-        uniforms.mousePosition3D.value.copy(currentMousePos.current);
-        uniforms.prevMousePosition3D.value.copy(prevMousePos.current);
+      if (Math.abs(influenceDelta) > 0.001) {
+        // Smooth easing - faster when entering, slower when leaving
+        const easeSpeed =
+          targetMouseInfluence.current > mouseInfluenceRef.current
+            ? 0.15
+            : 0.08;
+        mouseInfluenceRef.current += influenceDelta * easeSpeed;
+
+        // Clamp to avoid overshooting
+        if (Math.abs(influenceDelta) < 0.01) {
+          mouseInfluenceRef.current = targetMouseInfluence.current;
+        }
       }
+
+      // Gradual decay when mouse stops moving over sphere
+      if (isMouseOverSphere.current) {
+        const timeSinceLastMouse = Date.now() - lastMouseTime.current;
+        if (timeSinceLastMouse > 150) {
+          // Slowly reduce influence if mouse isn't moving
+          targetMouseInfluence.current = Math.max(
+            0.3,
+            targetMouseInfluence.current * 0.98
+          );
+        }
+      }
+
+      uniforms.mouseInfluence.value = mouseInfluenceRef.current;
+      uniforms.mousePosition3D.value.copy(currentMousePos.current);
+      uniforms.prevMousePosition3D.value.copy(prevMousePos.current);
 
       // Slower rotation for better performance
       particleGroupRef.current.rotation.y += 0.0008;
@@ -582,6 +744,7 @@ interface ParticleSphereProps {
   opacity?: number;
   className?: string;
   style?: React.CSSProperties;
+  mouseInteractionColor?: string;
 }
 
 export default function ParticleSphere({
@@ -596,6 +759,7 @@ export default function ParticleSphere({
   opacity = 0.7,
   className = "",
   style = {},
+  mouseInteractionColor = "#ff6b9d",
 }: ParticleSphereProps) {
   return (
     <div className={`w-full h-screen ${className}`} style={style}>
@@ -619,6 +783,7 @@ export default function ParticleSphere({
           fluidViscosity={fluidViscosity}
           waveAmplitude={waveAmplitude}
           opacity={opacity}
+          mouseInteractionColor={mouseInteractionColor}
         />
         <OrbitControls
           enableZoom={false}
@@ -630,4 +795,27 @@ export default function ParticleSphere({
       </Canvas>
     </div>
   );
+}
+
+{
+  // const color = "#000000"; // You can change this to any color you want
+  // const particleSize = 0.25; // Size of the particles
+  // const blurAmount = 0.3; // Amount of blur for the particles
+  // const sizeVariation = 0.9; // Variation in particle size
+  // const chaosAmount = 0.2; // Amount of chaos in particle movement
+  // const fluidViscosity = 0.4; // Viscosity of the fluid simulation
+  // const waveAmplitude = 0.5; // Amplitude of the wave effect
+  // const opacity = 0.7; // Opacity of the particles
+  // const particleCount = 10000; // Number of particles in the sphere
+  /* <ParticleSphere
+  color={color}
+  particleCount={particleCount}
+  particleSize={particleSize}
+  blurAmount={blurAmount}
+  sizeVariation={sizeVariation}
+  chaosAmount={chaosAmount}
+  fluidViscosity={fluidViscosity}
+  waveAmplitude={waveAmplitude}
+  opacity={opacity}
+/>; */
 }

@@ -75,7 +75,7 @@ export function Nav() {
         className='fixed inset-0 bg-gray-50/25 backdrop-blur-sm z-40 lg:hidden'
         style={{ opacity: 0, display: "none" }}
       />
-      <nav className='w-[calc(100%-2rem)] max-w-[1440px] top-4 left-1/2 -translate-x-1/2 fixed z-50 right-0 '>
+      <nav className='w-[calc(100%-2rem)] container top-4 left-1/2 -translate-x-1/2 fixed z-50 right-0 '>
         <div className='flex justify-between ring-2 ring-neutral-100 items-center bg-neutral-0 px-3 relative py-4 rounded max-h-11'>
           {/* Logo */}
           <div className='relative z-50'>

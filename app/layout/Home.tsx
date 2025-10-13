@@ -15,7 +15,13 @@ export function Home() {
   const fluidViscosity = 0.4; // Viscosity of the fluid simulation
   const waveAmplitude = 0.5; // Amplitude of the wave effect
   const opacity = 0.7; // Opacity of the particles
-  const particleCount = 5000; // Number of particles in the sphere
+  const particleCount = 7000; // Number of particles in the sphere
+  const mouseInteractionColor = "#ff0000"; // Color when mouse interacts with particles
+
+  // Connection line settings
+  const showConnections = true; // Enable connection lines between particles
+  const connectionDistance = 1.0; // Maximum distance for particles to connect (increased for more visibility)
+  const connectionOpacity = 0.6; // Opacity of connection lines (increased for more visibility)
   // Factor for settling the particles
 
   useEffect(() => {
@@ -35,7 +41,7 @@ export function Home() {
     <PageTransition>
       <section className='flex flex-col items-center justify-center min-h-lvh px-4 2xl:px-0 overflow-x-hidden '>
         <div className='p-4 rounded-sm border-2  border-neutral-100 h-[calc(100vh-6rem)] mt-14 grid grid-rows-12 grid-cols-1 md:grid-cols-12 relative test-bg xl:grid-rows-11'>
-          <div className='absolute top-[40%] w-full left-1/2 -translate-x-1/2 -translate-y-1/2 overflow-hidden'>
+          <div className='absolute z-20 top-[40%] w-full left-1/2 -translate-x-1/2 -translate-y-1/2 overflow-hidden'>
             <ParticleSphere
               color={color}
               particleCount={particleCount}
@@ -46,12 +52,11 @@ export function Home() {
               fluidViscosity={fluidViscosity}
               waveAmplitude={waveAmplitude}
               opacity={opacity}
+              mouseInteractionColor={mouseInteractionColor}
             />
           </div>
-          {/* <div className='absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 overflow test-bg'>
-            <AnimatedBlob className='size-56 ' />
-          </div> */}
-          <div className='text-[clamp(1.25rem,0.879rem+1.524vw,2.25rem)] font-medium row-start-9 z-10 md:col-span-10 lg:col-span-8 xl:col-span-7'>
+
+          <div className='text-[clamp(1.25rem,0.879rem+1.524vw,2.4rem)] font-medium row-start-9 z-10 md:col-span-10 lg:col-span-8 xl:col-span-7'>
             A student who has goals and dreams to achieve, with a journey to
             finish, lessons to learn, and a drive to bring technology closer to
             everyone. Based in Hanoi, Vietnam. 🇻🇳
