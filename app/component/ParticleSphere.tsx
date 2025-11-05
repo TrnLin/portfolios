@@ -24,6 +24,15 @@ const vertexShader = `
   uniform float dropStrength;
   uniform float baseOpacity;
   uniform vec3 mouseInteractionColor;
+  uniform float pulseStrength;
+  uniform float pulseFrequency;
+  uniform float pulseInterval;
+  uniform float mouseInteractionRadius;
+  uniform float mouseWaveStrength;
+  uniform float mouseVortexStrength;
+  uniform float mouseDragStrength;
+  uniform float mousePushPullStrength;
+  uniform float mouseColorInfluenceRadius;
   
   // Simple 3D noise function for organic movement
   float noise3D(vec3 p) {
@@ -84,6 +93,56 @@ const vertexShader = `
     pos += noiseDisplacement;
     pos += pulseDirection * pulse * chaos;
     pos += swirlOffset;
+    
+    // Continuous center pulse animation (similar to water drop effect)
+    if (pulseStrength > 0.01) {
+      // Calculate distance from center
+      float distanceFromCenter = length(pos);
+      
+      // Create multiple pulse waves traveling outward
+      float pulseTime = time * pulseFrequency;
+      
+      // Primary pulse wave
+      float primaryPulse = mod(pulseTime, pulseInterval);
+      float primaryRipple = primaryPulse * 4.0;
+      float primaryWidth = 0.4 + primaryPulse * 0.2;
+      float primaryDecay = 1.0 - (primaryPulse / pulseInterval);
+      
+      float primaryInfluence = exp(-abs(distanceFromCenter - primaryRipple) / primaryWidth);
+      float primaryWave = sin((distanceFromCenter - primaryRipple) * 18.0) * 
+                         primaryInfluence * 
+                         pulseStrength * 
+                         primaryDecay * 0.25;
+      
+      vec3 pulseDir = normalize(pos + vec3(0.001));
+      pos += pulseDir * primaryWave;
+      
+      // Vertical component for the wave crest
+      float waveHeight = cos((distanceFromCenter - primaryRipple) * 18.0) * 
+                        primaryInfluence * 
+                        pulseStrength * 
+                        primaryDecay * 0.15;
+      pos.z += waveHeight;
+      
+      // Surface tension oscillation in center
+      if (distanceFromCenter < 1.8) {
+        float centerAge = mod(primaryPulse, 1.0);
+        float tensionFalloff = (1.8 - distanceFromCenter) / 1.8;
+        float tensionOscillation = sin(centerAge * 12.0 + pulseTime * 3.0) * 
+                                  (1.0 - centerAge) * 
+                                  tensionFalloff * 
+                                  pulseStrength * 0.12;
+        
+        pos.z += tensionOscillation;
+      }
+      
+      // Capillary waves (fine ripples)
+      float capillaryFreq = 25.0 + randomOffset * 10.0;
+      float capillaryWave = sin(distanceFromCenter * capillaryFreq - pulseTime * 8.0) * 
+                           pulseStrength * 0.05;
+      
+      pos += pulseDir * capillaryWave;
+    }
     
     // Enhanced water drop effect with realistic physics
     if (dropStrength > 0.01) {
@@ -187,36 +246,38 @@ const vertexShader = `
       vec3 mousePos3D = mousePosition3D;
       float distanceToMouse = length(pos - mousePos3D);
       
-      if (distanceToMouse < 5.5) { // Larger interaction radius
+      if (distanceToMouse < mouseInteractionRadius) {
         // Enhanced wave calculation with multiple frequencies
         float wave1 = sin(distanceToMouse * 3.0 - time * 4.0) * 
                      exp(-distanceToMouse * 0.5) * 
                      waveAmplitude * 
-                     mouseInfluence * 0.8;
+                     mouseInfluence * 
+                     mouseWaveStrength;
         
         float wave2 = cos(distanceToMouse * 6.0 - time * 5.0) * 
                      exp(-distanceToMouse * 0.7) * 
                      waveAmplitude * 
-                     mouseInfluence * 0.4;
+                     mouseInfluence * 
+                     (mouseWaveStrength * 0.5);
         
         vec3 waveDirection = normalize(pos - mousePos3D + vec3(0.001));
         
         // Stronger displacement
-        pos += waveDirection * (wave1 + wave2) * 0.7;
+        pos += waveDirection * (wave1 + wave2);
         
         // Add spiral/vortex effect around mouse
         vec3 tangent = cross(waveDirection, vec3(0.0, 1.0, 0.0));
-        float vortexStrength = exp(-distanceToMouse * 0.4) * mouseInfluence;
-        pos += tangent * sin(time * 2.0 + distanceToMouse * 2.0) * vortexStrength * 0.5;
+        float vortexStrength = exp(-distanceToMouse * 0.4) * mouseInfluence * mouseVortexStrength;
+        pos += tangent * sin(time * 2.0 + distanceToMouse * 2.0) * vortexStrength;
         
         // Enhanced flow with drag
         vec3 mouseVelocity = (mousePos3D - prevMousePosition3D) * 30.0;
         float influence = exp(-distanceToMouse * 0.4) * mouseInfluence;
-        pos += mouseVelocity * influence * fluidViscosity * 0.03;
+        pos += mouseVelocity * influence * fluidViscosity * mouseDragStrength;
         
         // Attraction/repulsion effect
-        float pushPull = sin(time * 3.0 + randomOffset * 6.28) * 0.3;
-        pos += waveDirection * pushPull * influence * 0.4;
+        float pushPull = sin(time * 3.0 + randomOffset * 6.28) * mousePushPullStrength;
+        pos += waveDirection * pushPull * influence;
       }
     }
     
@@ -238,6 +299,29 @@ const vertexShader = `
     // Enhanced alpha calculation with realistic drop effects
     float movement = length(pos - originalPos);
     float mouseEffect = mouseInfluence * exp(-length(pos - mousePosition3D) * 0.8);
+    
+    // Continuous pulse effect on alpha
+    float pulseEffect = 0.0;
+    if (pulseStrength > 0.01) {
+      float distanceFromCenter = length(pos);
+      float pulseTime = time * pulseFrequency;
+      
+      // Primary pulse glow
+      float primaryPulse = mod(pulseTime, pulseInterval);
+      float primaryRipple = primaryPulse * 4.0;
+      float rippleProximity = abs(distanceFromCenter - primaryRipple);
+      if (rippleProximity < 0.6) {
+        float primaryDecay = 1.0 - (primaryPulse / pulseInterval);
+        float rippleGlow = exp(-rippleProximity * 3.0) * pulseStrength * primaryDecay;
+        pulseEffect += rippleGlow * 0.4;
+      }
+      
+      // Center glow
+      if (distanceFromCenter < 1.8) {
+        float centerGlow = (1.8 - distanceFromCenter) / 1.8 * pulseStrength;
+        pulseEffect += centerGlow * 0.2;
+      }
+    }
     
     float dropEffect = 0.0;
     if (dropStrength > 0.01) {
@@ -281,7 +365,7 @@ const vertexShader = `
     vMouseDistance = distanceToMouse;
     
     // Calculate color influence based on distance and mouse influence
-    float colorInfluenceRadius = 4.0;
+    float colorInfluenceRadius = mouseColorInfluenceRadius;
     float colorMixFactor = 0.0;
     
     if (mouseInfluence > 0.01 && distanceToMouse < colorInfluenceRadius) {
@@ -309,12 +393,36 @@ const vertexShader = `
     // Mix original color with interaction color
     vColor = mix(customColor, mouseInteractionColor, colorMixFactor);
     
-    vAlpha = clamp(baseOpacity + movement * 0.2 + dropEffect + mouseEffect * 0.15, 0.1, 1.0);
+    vAlpha = clamp(baseOpacity + movement * 0.2 + pulseEffect + dropEffect + mouseEffect * 0.15, 0.1, 1.0);
     
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
     
     // Enhanced size calculation with realistic drop particle scaling
     float dynamicSize = 1.0 + movement * 0.3 + mouseEffect * 0.15;
+    
+    // Continuous pulse effect on size
+    if (pulseStrength > 0.01) {
+      float distanceFromCenter = length(pos);
+      float pulseTime = time * pulseFrequency;
+      
+      // Primary pulse size increase
+      float primaryPulse = mod(pulseTime, pulseInterval);
+      float primaryRipple = primaryPulse * 4.0;
+      float rippleProximity = abs(distanceFromCenter - primaryRipple);
+      if (rippleProximity < 0.4) {
+        float primaryDecay = 1.0 - (primaryPulse / pulseInterval);
+        float rippleSize = exp(-rippleProximity * 4.0) * pulseStrength * primaryDecay;
+        dynamicSize += rippleSize * 0.6;
+      }
+      
+      // Center pulse size variation
+      if (distanceFromCenter < 1.8) {
+        float centerPulse = sin(pulseTime * 3.0) * 
+                           (1.8 - distanceFromCenter) / 1.8 * 
+                           pulseStrength;
+        dynamicSize += abs(centerPulse) * 0.4;
+      }
+    }
     
     if (dropStrength > 0.01) {
       float dropAge = time - dropTime;
@@ -390,6 +498,22 @@ interface ParticleSystemProps {
   waveAmplitude?: number;
   opacity?: number;
   mouseInteractionColor?: string;
+  pulseStrength?: number;
+  pulseFrequency?: number;
+  pulseInterval?: number;
+  // Mouse interaction controls
+  mouseInteractionRadius?: number;
+  mouseWaveStrength?: number;
+  mouseVortexStrength?: number;
+  mouseDragStrength?: number;
+  mousePushPullStrength?: number;
+  mouseEnterSpeed?: number;
+  mouseExitSpeed?: number;
+  mouseColorInfluenceRadius?: number;
+  // Click interaction controls
+  clickStrength?: number;
+  clickRandomness?: number;
+  maxConcurrentClicks?: number;
 }
 
 function ParticleSystem({
@@ -403,6 +527,26 @@ function ParticleSystem({
   waveAmplitude = 0.3,
   opacity = 0.7,
   mouseInteractionColor = "#ff6b9d",
+
+  // Pulse effect controls
+  pulseStrength = 0.5,
+  pulseFrequency = 0.5,
+  pulseInterval = 6.0,
+
+  // Mouse interaction controls with more aggressive defaults
+  mouseInteractionRadius = 5.5,
+  mouseWaveStrength = 1.2,
+  mouseVortexStrength = 0.8,
+  mouseDragStrength = 0.05,
+  mousePushPullStrength = 0.6,
+  mouseEnterSpeed = 0.2,
+  mouseExitSpeed = 0.06,
+  mouseColorInfluenceRadius = 4.5,
+
+  // Click interaction controls
+  clickStrength = 1.5,
+  clickRandomness = 0.3,
+  maxConcurrentClicks = 3,
 }: ParticleSystemProps) {
   const meshRef = useRef<THREE.Points>(null);
   const particleGroupRef = useRef<THREE.Group>(null);
@@ -414,6 +558,17 @@ function ParticleSystem({
   const isMouseOverSphere = useRef(false);
   const frameCount = useRef(0);
   const mouseLeaveTimeoutRef = useRef<number | null>(null);
+
+  // Click management refs
+  const activeClicksRef = useRef<
+    Array<{
+      id: number;
+      position: THREE.Vector3;
+      startTime: number;
+      strength: number;
+    }>
+  >([]);
+  const nextClickId = useRef(0);
 
   const { raycaster, mouse, camera, gl } = useThree();
 
@@ -471,8 +626,28 @@ function ParticleSystem({
       dropStrength: { value: 0 },
       baseOpacity: { value: opacity },
       mouseInteractionColor: { value: new THREE.Color(mouseInteractionColor) },
+      pulseStrength: { value: pulseStrength },
+      pulseFrequency: { value: pulseFrequency },
+      pulseInterval: { value: pulseInterval },
+      mouseInteractionRadius: { value: mouseInteractionRadius },
+      mouseWaveStrength: { value: mouseWaveStrength },
+      mouseVortexStrength: { value: mouseVortexStrength },
+      mouseDragStrength: { value: mouseDragStrength },
+      mousePushPullStrength: { value: mousePushPullStrength },
+      mouseColorInfluenceRadius: { value: mouseColorInfluenceRadius },
     }),
-    [mouseInteractionColor]
+    [
+      mouseInteractionColor,
+      pulseStrength,
+      pulseFrequency,
+      pulseInterval,
+      mouseInteractionRadius,
+      mouseWaveStrength,
+      mouseVortexStrength,
+      mouseDragStrength,
+      mousePushPullStrength,
+      mouseColorInfluenceRadius,
+    ]
   );
 
   // Update uniforms only when props change
@@ -483,6 +658,15 @@ function ParticleSystem({
     uniforms.fluidViscosity.value = fluidViscosity;
     uniforms.waveAmplitude.value = waveAmplitude;
     uniforms.baseOpacity.value = opacity;
+    uniforms.pulseStrength.value = pulseStrength;
+    uniforms.pulseFrequency.value = pulseFrequency;
+    uniforms.pulseInterval.value = pulseInterval;
+    uniforms.mouseInteractionRadius.value = mouseInteractionRadius;
+    uniforms.mouseWaveStrength.value = mouseWaveStrength;
+    uniforms.mouseVortexStrength.value = mouseVortexStrength;
+    uniforms.mouseDragStrength.value = mouseDragStrength;
+    uniforms.mousePushPullStrength.value = mousePushPullStrength;
+    uniforms.mouseColorInfluenceRadius.value = mouseColorInfluenceRadius;
   }, [
     particleSize,
     blurAmount,
@@ -490,6 +674,15 @@ function ParticleSystem({
     fluidViscosity,
     waveAmplitude,
     opacity,
+    pulseStrength,
+    pulseFrequency,
+    pulseInterval,
+    mouseInteractionRadius,
+    mouseWaveStrength,
+    mouseVortexStrength,
+    mouseDragStrength,
+    mousePushPullStrength,
+    mouseColorInfluenceRadius,
     uniforms,
   ]);
 
@@ -594,24 +787,52 @@ function ParticleSystem({
       if (isMouseOverSphere.current) {
         const currentTime = uniforms.time.value;
 
+        // Remove oldest click if we're at max capacity
+        if (activeClicksRef.current.length >= maxConcurrentClicks) {
+          activeClicksRef.current.shift();
+        }
+
         // The currentMousePos is already in local space from updateMousePosition
         const clickPosition = currentMousePos.current.clone();
 
-        // Add slight randomization to drop position for more natural effect
+        // Add enhanced randomization for more natural effect
         const randomOffset = new THREE.Vector3(
-          (Math.random() - 0.5) * 0.1,
-          (Math.random() - 0.5) * 0.1,
-          (Math.random() - 0.5) * 0.1
+          (Math.random() - 0.5) * clickRandomness,
+          (Math.random() - 0.5) * clickRandomness,
+          (Math.random() - 0.5) * clickRandomness
         );
         clickPosition.add(randomOffset);
 
+        // Add variation to click strength for more organic feel
+        const strengthVariation = 0.8 + Math.random() * 0.4; // 0.8 to 1.2
+        const finalStrength = clickStrength * strengthVariation;
+
+        // Create new click
+        const newClick = {
+          id: nextClickId.current++,
+          position: clickPosition,
+          startTime: currentTime,
+          strength: finalStrength,
+        };
+
+        activeClicksRef.current.push(newClick);
+
+        // Set initial drop effect (for backward compatibility)
         uniforms.dropPosition.value.copy(clickPosition);
         uniforms.dropTime.value = currentTime;
-        uniforms.dropStrength.value = 1.0;
+        uniforms.dropStrength.value = finalStrength;
 
-        // Rest of the animation code stays the same...
+        // Visual feedback - brief cursor change
+        canvas.style.cursor = "grabbing";
+        setTimeout(() => {
+          if (isMouseOverSphere.current) {
+            canvas.style.cursor = "pointer";
+          }
+        }, 150);
+
+        // Enhanced animation with stronger initial impact
         const fadeStart = currentTime;
-        const totalDuration = 4.0;
+        const totalDuration = 4.5;
 
         const fadeInterval = setInterval(() => {
           const elapsed = uniforms.time.value - fadeStart;
@@ -619,22 +840,37 @@ function ParticleSystem({
           if (elapsed >= totalDuration) {
             uniforms.dropStrength.value = 0;
             clearInterval(fadeInterval);
-          } else {
-            let strength = 1.0;
 
-            if (elapsed < 0.5) {
-              strength = 1.0;
-            } else if (elapsed < 1.5) {
-              strength = 0.9 * Math.exp(-(elapsed - 0.5) * 0.8);
-            } else if (elapsed < 2.5) {
-              strength = 0.4 * Math.exp(-(elapsed - 1.5) * 1.2);
+            // Remove this click from active list
+            activeClicksRef.current = activeClicksRef.current.filter(
+              (click) => click.id !== newClick.id
+            );
+          } else {
+            let strength = finalStrength;
+
+            // Enhanced decay curve with stronger initial impact
+            if (elapsed < 0.3) {
+              // Stronger initial impact
+              strength = finalStrength * (1.0 + Math.sin(elapsed * 10.0) * 0.2);
+            } else if (elapsed < 1.0) {
+              // Fast decay
+              strength =
+                finalStrength * 0.95 * Math.exp(-(elapsed - 0.3) * 1.2);
+            } else if (elapsed < 2.0) {
+              // Medium decay
+              strength = finalStrength * 0.5 * Math.exp(-(elapsed - 1.0) * 1.0);
+            } else if (elapsed < 3.5) {
+              // Slow decay
+              strength =
+                finalStrength * 0.25 * Math.exp(-(elapsed - 2.0) * 0.8);
             } else {
-              strength = 0.2 * Math.exp(-(elapsed - 2.5) * 2.0);
+              // Final fade
+              strength = finalStrength * 0.1 * Math.exp(-(elapsed - 3.5) * 2.5);
             }
 
             uniforms.dropStrength.value = Math.max(0, strength);
           }
-        }, 32);
+        }, 24); // ~42fps for smoother animation
       }
     };
 
@@ -667,8 +903,8 @@ function ParticleSystem({
         // Smooth easing - faster when entering, slower when leaving
         const easeSpeed =
           targetMouseInfluence.current > mouseInfluenceRef.current
-            ? 0.15
-            : 0.08;
+            ? mouseEnterSpeed
+            : mouseExitSpeed;
         mouseInfluenceRef.current += influenceDelta * easeSpeed;
 
         // Clamp to avoid overshooting
@@ -745,6 +981,22 @@ interface ParticleSphereProps {
   className?: string;
   style?: React.CSSProperties;
   mouseInteractionColor?: string;
+  pulseStrength?: number;
+  pulseFrequency?: number;
+  pulseInterval?: number;
+  // Mouse interaction controls
+  mouseInteractionRadius?: number;
+  mouseWaveStrength?: number;
+  mouseVortexStrength?: number;
+  mouseDragStrength?: number;
+  mousePushPullStrength?: number;
+  mouseEnterSpeed?: number;
+  mouseExitSpeed?: number;
+  mouseColorInfluenceRadius?: number;
+  // Click interaction controls
+  clickStrength?: number;
+  clickRandomness?: number;
+  maxConcurrentClicks?: number;
 }
 
 export default function ParticleSphere({
@@ -760,9 +1012,28 @@ export default function ParticleSphere({
   className = "",
   style = {},
   mouseInteractionColor = "#ff6b9d",
+  pulseStrength = 0.4,
+  pulseFrequency = 0.6,
+  pulseInterval = 1.9,
+  // Mouse interaction controls with more aggressive defaults
+  mouseInteractionRadius = 5.5,
+  mouseWaveStrength = 1.2,
+  mouseVortexStrength = 0.8,
+  mouseDragStrength = 0.05,
+  mousePushPullStrength = 0.6,
+  mouseEnterSpeed = 0.2,
+  mouseExitSpeed = 0.06,
+  mouseColorInfluenceRadius = 4.5,
+  // Click interaction controls
+  clickStrength = 1.5,
+  clickRandomness = 0.3,
+  maxConcurrentClicks = 3,
 }: ParticleSphereProps) {
   return (
-    <div className={`w-full h-screen ${className}`} style={style}>
+    <div
+      className={`w-full h-screen max-w-full overflow-hidden ${className}`}
+      style={style}
+    >
       <Canvas
         camera={{ position: [0, 0, 8], fov: 75 }}
         gl={{
@@ -784,6 +1055,20 @@ export default function ParticleSphere({
           waveAmplitude={waveAmplitude}
           opacity={opacity}
           mouseInteractionColor={mouseInteractionColor}
+          pulseStrength={pulseStrength}
+          pulseFrequency={pulseFrequency}
+          pulseInterval={pulseInterval}
+          mouseInteractionRadius={mouseInteractionRadius}
+          mouseWaveStrength={mouseWaveStrength}
+          mouseVortexStrength={mouseVortexStrength}
+          mouseDragStrength={mouseDragStrength}
+          mousePushPullStrength={mousePushPullStrength}
+          mouseEnterSpeed={mouseEnterSpeed}
+          mouseExitSpeed={mouseExitSpeed}
+          mouseColorInfluenceRadius={mouseColorInfluenceRadius}
+          clickStrength={clickStrength}
+          clickRandomness={clickRandomness}
+          maxConcurrentClicks={maxConcurrentClicks}
         />
         <OrbitControls
           enableZoom={false}
@@ -807,6 +1092,15 @@ export default function ParticleSphere({
   // const waveAmplitude = 0.5; // Amplitude of the wave effect
   // const opacity = 0.7; // Opacity of the particles
   // const particleCount = 10000; // Number of particles in the sphere
+  // Mouse Interaction Controls (NEW!)
+  // const mouseInteractionRadius = 5.5; // Radius of mouse influence (larger = wider effect)
+  // const mouseWaveStrength = 1.2; // Strength of wave displacement (higher = more aggressive)
+  // const mouseVortexStrength = 0.8; // Strength of spiral/vortex effect (higher = more spin)
+  // const mouseDragStrength = 0.05; // Strength of drag following mouse movement (higher = more follow)
+  // const mousePushPullStrength = 0.6; // Strength of push/pull pulsing (higher = more push)
+  // const mouseEnterSpeed = 0.2; // Speed of fade-in when mouse enters (0.0-1.0, higher = faster)
+  // const mouseExitSpeed = 0.06; // Speed of fade-out when mouse exits (0.0-1.0, lower = slower)
+  // const mouseColorInfluenceRadius = 4.5; // Radius of color change effect (larger = wider color spread)
   /* <ParticleSphere
   color={color}
   particleCount={particleCount}
@@ -817,5 +1111,13 @@ export default function ParticleSphere({
   fluidViscosity={fluidViscosity}
   waveAmplitude={waveAmplitude}
   opacity={opacity}
+  mouseInteractionRadius={mouseInteractionRadius}
+  mouseWaveStrength={mouseWaveStrength}
+  mouseVortexStrength={mouseVortexStrength}
+  mouseDragStrength={mouseDragStrength}
+  mousePushPullStrength={mousePushPullStrength}
+  mouseEnterSpeed={mouseEnterSpeed}
+  mouseExitSpeed={mouseExitSpeed}
+  mouseColorInfluenceRadius={mouseColorInfluenceRadius}
 />; */
 }

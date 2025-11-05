@@ -15,14 +15,23 @@ export function Home() {
   const fluidViscosity = 0.4; // Viscosity of the fluid simulation
   const waveAmplitude = 0.5; // Amplitude of the wave effect
   const opacity = 0.7; // Opacity of the particles
-  const particleCount = 7000; // Number of particles in the sphere
+  const particleCount = 4000; // Number of particles in the sphere
   const mouseInteractionColor = "#ff0000"; // Color when mouse interacts with particles
 
-  // Connection line settings
-  const showConnections = true; // Enable connection lines between particles
-  const connectionDistance = 1.0; // Maximum distance for particles to connect (increased for more visibility)
-  const connectionOpacity = 0.6; // Opacity of connection lines (increased for more visibility)
-  // Factor for settling the particles
+  //
+  const mouseInteractionRadius = 4.0; // Radius of mouse influence (larger = wider effect)
+  const mouseWaveStrength = 0.7; // Strength of wave displacement (higher = more aggressive)
+  const mouseVortexStrength = 0.8; // Strength of spiral/vortex effect (higher = more spin)
+  const mouseDragStrength = 0.05; // Strength of drag following mouse movement (higher = more follow)
+  const mousePushPullStrength = 0.6; // Strength of push/pull pulsing (higher = more push)
+  const mouseEnterSpeed = 0.09; // Speed of fade-in when mouse enters (0.0-1.0, higher = faster)
+  const mouseExitSpeed = 0.06; // Speed of fade-out when mouse exits (0.0-1.0, lower = slower)
+  const mouseColorInfluenceRadius = 4.0; // Radius of color change effect (larger = wider color spread)
+
+  // Click Interaction Controls (NEW!)
+  const clickStrength = 0.9; // Strength of click effect (0.5-3.0, higher = bigger splash)
+  const clickRandomness = 0.25; // Randomness of click position (0.0-1.0, adds natural variation)
+  const maxConcurrentClicks = 1; // Maximum simultaneous click effects (1-5)
 
   useEffect(() => {
     // This effect runs once when the component mounts
@@ -39,9 +48,9 @@ export function Home() {
   }, []); // Empty dependency array means this effect runs once on mount
   return (
     <PageTransition>
-      <section className='flex flex-col items-center justify-center min-h-lvh px-4 2xl:px-0 overflow-x-hidden '>
-        <div className='p-4 rounded-sm border-2  border-neutral-100 h-[calc(100vh-6rem)] mt-14 grid grid-rows-12 grid-cols-1 md:grid-cols-12 relative test-bg xl:grid-rows-11'>
-          <div className='absolute z-20 top-[40%] w-full left-1/2 -translate-x-1/2 -translate-y-1/2 overflow-hidden'>
+      <section className='flex flex-col items-center justify-center min-h-lvh px-4 2xl:px-0 overflow-x-hidden max-w-full'>
+        <div className='p-4 rounded-sm border-2 border-neutral-100 h-[calc(100vh-6rem)] mt-14 grid grid-rows-12 grid-cols-1 md:grid-cols-12 relative test-bg xl:grid-rows-11 w-full '>
+          <div className='absolute z-20 top-[40%] w-full left-1/2 -translate-x-1/2 -translate-y-1/2 overflow-hidden pointer-events-none max-w-full'>
             <ParticleSphere
               color={color}
               particleCount={particleCount}
@@ -53,20 +62,31 @@ export function Home() {
               waveAmplitude={waveAmplitude}
               opacity={opacity}
               mouseInteractionColor={mouseInteractionColor}
+              mouseInteractionRadius={mouseInteractionRadius}
+              mouseWaveStrength={mouseWaveStrength}
+              mouseVortexStrength={mouseVortexStrength}
+              mouseDragStrength={mouseDragStrength}
+              mousePushPullStrength={mousePushPullStrength}
+              mouseEnterSpeed={mouseEnterSpeed}
+              mouseExitSpeed={mouseExitSpeed}
+              mouseColorInfluenceRadius={mouseColorInfluenceRadius}
+              clickStrength={clickStrength}
+              clickRandomness={clickRandomness}
+              maxConcurrentClicks={maxConcurrentClicks}
             />
           </div>
 
-          <div className='text-[clamp(1.25rem,0.879rem+1.524vw,2.4rem)] font-medium row-start-9 z-10 md:col-span-10 lg:col-span-8 xl:col-span-7'>
+          <div className='text-[clamp(1.25rem,0.879rem+1.524vw,2.4rem)] font-medium row-start-9  md:col-span-10 lg:col-span-8 xl:col-span-7 z-50'>
             A student who has goals and dreams to achieve, with a journey to
             finish, lessons to learn, and a drive to bring technology closer to
             everyone. Based in Hanoi, Vietnam. 🇻🇳
           </div>
-          <div className='flex flex-col items-start text-base font-medium z-10 lg:row-start-9 lg:col-start-10 md:col-span-4'>
+          <div className='flex flex-col items-start text-base font-medium z-50 lg:row-start-9 lg:col-start-10 md:col-span-4 '>
             <span>Software Engineer</span>
             <span>FE Developer </span>
             <span>UI & UX Design</span>
           </div>
-          <div className='row-start-12 lg:col-start-10 lg:row-start-11 md:col-span-2  z-10 mt-2'>
+          <div className='row-start-12 lg:col-start-10 lg:row-start-11 md:col-span-2  z-50 mt-2'>
             <div className='group flex flex-row items-center justify-center gap-2 w-fit '>
               <span>Scroll down</span>
               <span>
